@@ -1,0 +1,110 @@
+-- Create 'departments' table
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50),
+    manager_id INT
+);
+
+-- Create 'employees' table
+CREATE TABLE employees (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50),
+    hire_date DATE,
+    job_title VARCHAR(50),
+    department_id INT REFERENCES departments(id)
+);
+
+-- Create 'projects' table
+CREATE TABLE projects (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50),
+    start_date DATE,
+    end_date DATE,
+    department_id INT REFERENCES departments(id)
+);
+
+-- Insert data into 'departments'
+INSERT INTO departments (name, manager_id)
+VALUES ('HR', 1), ('IT', 2), ('Sales', 3);
+
+-- Insert data into 'employees'
+INSERT INTO employees (name, hire_date, job_title, department_id)
+VALUES ('John Doe', '2018-06-20', 'HR Manager', 1),
+       ('Jane Smith', '2019-07-15', 'IT Manager', 2),
+       ('Alice Johnson', '2020-01-10', 'Sales Manager', 3),
+       ('Bob Miller', '2021-04-30', 'HR Associate', 1),
+       ('Charlie Brown', '2022-10-01', 'IT Associate', 2),
+       ('Dave Davis', '2023-03-15', 'Sales Associate', 3);
+
+-- Insert data into 'projects'
+INSERT INTO projects (name, start_date, end_date, department_id)
+VALUES ('HR Project 1', '2023-01-01', '2023-06-30', 1),
+       ('IT Project 1', '2023-02-01', '2023-07-31', 2),
+       ('Sales Project 1', '2023-03-01', '2023-08-31', 3);
+       
+       UPDATE departments
+SET manager_id = (SELECT id FROM employees WHERE name = 'John Doe')
+WHERE name = 'HR';
+
+UPDATE departments
+SET manager_id = (SELECT id FROM employees WHERE name = 'Jane Smith')
+WHERE name = 'IT';
+
+UPDATE departments
+SET manager_id = (SELECT id FROM employees WHERE name = 'Alice Johnson')
+WHERE name = 'Sales';
+
+select *
+from departments;
+
+select *
+from employees;
+
+select *
+from projects;
+
+--Q1 Find the longest ongoing project for each department.
+
+select a.name as project_name,a.dept_name,a.proj_duration
+from(
+select a.name,a.start_date,a.end_date,b.name as dept_name,a.end_date-a.start_date as proj_duration,
+dense_rank() over(partition by department_id order by a.end_date-a.start_date desc) as proj_duration_rank
+from projects as a
+join
+departments as b
+on a.department_id=b.id) as a
+where a.proj_duration_rank =1;
+
+--Q2 Find all employees who are not managers.
+select a.name,a.job_title,b.name as dept_name
+from employees as a
+join
+departments as b
+on a.department_id=b.id and a.id != b.manager_id;
+
+--Q3 Find all employees who have been hired after the start of a project in their department.
+select a.name
+from employees as a
+join
+projects as b
+on a.department_id=b.department_id and a.hire_date<b.start_date
+group by a.department_id,a.name,a.hire_date,b.start_date;
+
+--Q4 Rank employees within each department based on their hire date (earliest hire gets the highest rank).
+select a.name,a.hire_date,b.name as department_name,
+dense_rank() over(partition by b.name order by a.hire_date) as hire_rank
+from employees as a
+join
+departments as b
+on a.department_id=b.id;
+
+--Q5 Find the duration between the hire date of each employee and the hire date of the next employee hired in the same department.
+select *
+from(
+select a.hire_date,b.name as department_name,
+a.hire_date-lag(a.hire_date,1) over (partition by b.name) as diff_in_days
+from employees as a
+join
+departments as b
+on a.department_id=b.id) as a
+where a.diff_in_days is not null;
